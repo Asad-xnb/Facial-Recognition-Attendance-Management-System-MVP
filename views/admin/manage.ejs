@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include("../includes/head.ejs", { title: "Manage System" }) %>
+</head>
+<body class="bg-background min-h-screen">
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40" onclick="toggleSidebar()"></div>
+  <!-- Sidebar -->
+  <%- include("../includes/sidebar.ejs", {active: "manage"}) %>
+
+  <!-- Main Content -->
+  <main id="mainContent" class="ml-64 p-8 transition-all duration-300">
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold text-foreground">System Management</h1>
+      <p class="text-muted mt-1">Manage teachers, classes (homerooms), courses, and students</p>
+    </div>
+
+    <!-- Management Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <!-- Add Teacher -->
+      <div class="bg-card border border-border rounded-xl p-6 hover:border-primary transition-all cursor-pointer" onclick="openModal('teacherModal')">
+        <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-foreground mb-2">Add Teacher</h3>
+        <p class="text-sm text-muted">Register teachers & staff</p>
+      </div>
+
+      <!-- Add Class -->
+      <div class="bg-card border border-border rounded-xl p-6 hover:border-primary transition-all cursor-pointer" onclick="openModal('classModal')">
+        <div class="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-foreground mb-2">Add Class / Homeroom</h3>
+        <p class="text-sm text-muted">Create classes & assign class teachers</p>
+      </div>
+
+      <!-- Add Course -->
+      <div class="bg-card border border-border rounded-xl p-6 hover:border-primary transition-all cursor-pointer" onclick="openModal('courseModal')">
+        <div class="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-foreground mb-2">Add Course / Subject</h3>
+        <p class="text-sm text-muted">Assign subject instructors</p>
+      </div>
+
+      <!-- Add Student -->
+      <div class="bg-card border border-border rounded-xl p-6 hover:border-primary transition-all cursor-pointer" onclick="window.location.href='/enrollment'">
+        <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-foreground mb-2">Enroll Student</h3>
+        <p class="text-sm text-muted">Register with facial recognition</p>
+      </div>
+    </div>
+
+    <!-- Overview Tables -->
+    <div class="space-y-4">
+      <!-- Teachers List -->
+      <div class="bg-card border border-border rounded-xl overflow-hidden">
+        <button onclick="toggleSection('teachers')" class="w-full p-6 flex items-center justify-between hover:bg-background/50 transition-all">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+              </svg>
+            </div>
+            <div class="text-left">
+              <h3 class="font-semibold text-foreground">Teachers & Staff</h3>
+              <p class="text-sm text-muted" id="teachersCount">0 teachers</p>
+            </div>
+          </div>
+          <svg id="teachersChevron" class="w-5 h-5 text-muted transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="teachersSection" class="hidden border-t border-border">
+          <div class="p-4 space-y-2" id="teachersList">
+            <p class="text-sm text-muted text-center py-4">No teachers added yet</p>
+          </div>
+          <div id="teachersShowMore" class="hidden border-t border-border p-3 text-center">
+            <button onclick="showMore('teachers')" class="text-sm text-primary hover:text-primary/80 font-medium">
+              Show more
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Classes List -->
+      <div class="bg-card border border-border rounded-xl overflow-hidden">
+        <button onclick="toggleSection('classes')" class="w-full p-6 flex items-center justify-between hover:bg-background/50 transition-all">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            <div class="text-left">
+              <h3 class="font-semibold text-foreground">Classes & Homerooms</h3>
+              <p class="text-sm text-muted" id="classesCount">0 classes</p>
+            </div>
+          </div>
+          <svg id="classesChevron" class="w-5 h-5 text-muted transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="classesSection" class="hidden border-t border-border">
+          <div class="p-4 space-y-2" id="classesList">
+            <p class="text-sm text-muted text-center py-4">No classes added yet</p>
+          </div>
+          <div id="classesShowMore" class="hidden border-t border-border p-3 text-center">
+            <button onclick="showMore('classes')" class="text-sm text-primary hover:text-primary/80 font-medium">
+              Show more
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Courses List -->
+      <div class="bg-card border border-border rounded-xl overflow-hidden">
+        <button onclick="toggleSection('courses')" class="w-full p-6 flex items-center justify-between hover:bg-background/50 transition-all">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+              </svg>
+            </div>
+            <div class="text-left">
+              <h3 class="font-semibold text-foreground">Courses & Subjects</h3>
+              <p class="text-sm text-muted" id="coursesCount">0 courses</p>
+            </div>
+          </div>
+          <svg id="coursesChevron" class="w-5 h-5 text-muted transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="coursesSection" class="hidden border-t border-border">
+          <div class="p-4 space-y-2" id="coursesList">
+            <p class="text-sm text-muted text-center py-4">No courses added yet</p>
+          </div>
+          <div id="coursesShowMore" class="hidden border-t border-border p-3 text-center">
+            <button onclick="showMore('courses')" class="text-sm text-primary hover:text-primary/80 font-medium">
+              Show more
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Students List -->
+      <div class="bg-card border border-border rounded-xl overflow-hidden">
+        <button onclick="toggleSection('students')" class="w-full p-6 flex items-center justify-between hover:bg-background/50 transition-all">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+              </svg>
+            </div>
+            <div class="text-left">
+              <h3 class="font-semibold text-foreground">Students Roster</h3>
+              <p class="text-sm text-muted" id="studentsCount">0 students</p>
+            </div>
+          </div>
+          <svg id="studentsChevron" class="w-5 h-5 text-muted transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="studentsSection" class="hidden border-t border-border">
+          <div class="p-4 space-y-2" id="studentsList">
+            <p class="text-sm text-muted text-center py-4">No students added yet</p>
+          </div>
+          <div id="studentsShowMore" class="hidden border-t border-border p-3 text-center">
+            <button onclick="showMore('students')" class="text-sm text-primary hover:text-primary/80 font-medium">
+              Show more
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add Teacher Modal -->
+  <div id="teacherModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="if(event.target === this) closeModal('teacherModal')">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md">
+      <h3 class="text-xl font-semibold text-foreground mb-4">Add Teacher</h3>
+      <form id="teacherForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Username</label>
+          <input type="text" name="username" required placeholder="e.g., john_doe" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Full Name</label>
+          <input type="text" name="fullName" required placeholder="e.g., John Doe" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Email</label>
+          <input type="email" name="email" required placeholder="e.g., john@example.com" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Password</label>
+          <div class="relative">
+            <input type="password" id="teacherPassword" name="password" required placeholder="Enter password" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary pr-10">
+            <button type="button" onclick="togglePasswordVisibility('teacherPassword', 'teacherEye', 'teacherEyeSlash')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-foreground">
+              <svg id="teacherEye" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+              <svg id="teacherEyeSlash" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="flex gap-3 pt-4">
+          <button type="submit" class="flex-1 px-4 py-2 bg-primary text-background font-medium rounded-lg hover:bg-primary/90">Add Teacher</button>
+          <button type="button" onclick="closeModal('teacherModal')" class="px-4 py-2 bg-background border border-border text-foreground rounded-lg hover:bg-card">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Class Modal -->
+  <div id="classModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="if(event.target === this) closeModal('classModal')">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md">
+      <h3 class="text-xl font-semibold text-foreground mb-4">Add Class / Homeroom</h3>
+      <form id="classForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Class / Grade Name</label>
+          <input type="text" name="name" required placeholder="e.g., Grade 6, Class 10, BSCS, BBA" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Semester / Level (Optional)</label>
+          <input type="number" name="semester" min="1" max="12" value="1" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Section</label>
+          <input type="text" name="section" value="A" required class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Assign Class / Homeroom Teacher (Optional)</label>
+          <div id="classTeacherContainer"></div>
+          <p class="text-xs text-muted mt-1">Search by name or email. Teacher stays with this class all day for daily attendance.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Academic Year</label>
+          <input type="text" name="academicYear" value="2024-2025" required class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div class="flex gap-3 pt-4">
+          <button type="submit" class="flex-1 px-4 py-2 bg-primary text-background font-medium rounded-lg hover:bg-primary/90">Create Class</button>
+          <button type="button" onclick="closeModal('classModal')" class="px-4 py-2 bg-background border border-border text-foreground rounded-lg hover:bg-card">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit / Assign Class Teacher Modal -->
+  <div id="editClassModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="if(event.target === this) closeModal('editClassModal')">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md">
+      <h3 class="text-xl font-semibold text-foreground mb-4">Assign Class / Homeroom Teacher</h3>
+      <form id="editClassForm" class="space-y-4">
+        <input type="hidden" id="editClassId">
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Class</label>
+          <input type="text" id="editClassName" disabled class="w-full px-4 py-2 bg-background/50 border border-border rounded-lg text-muted">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Class / Homeroom Teacher</label>
+          <div id="editClassTeacherContainer"></div>
+          <p class="text-xs text-muted mt-1">Search by name or email. Instant typeahead autocompletion.</p>
+        </div>
+        <div class="flex gap-3 pt-4">
+          <button type="submit" class="flex-1 px-4 py-2 bg-primary text-background font-medium rounded-lg hover:bg-primary/90">Save Assignment</button>
+          <button type="button" onclick="closeModal('editClassModal')" class="px-4 py-2 bg-background border border-border text-foreground rounded-lg hover:bg-card">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Course Modal -->
+  <div id="courseModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="if(event.target === this) closeModal('courseModal')">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md">
+      <h3 class="text-xl font-semibold text-foreground mb-4">Add Course / Subject</h3>
+      <form id="courseForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Course Name</label>
+          <input type="text" name="name" required placeholder="e.g., Data Structures" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Course Code</label>
+          <input type="text" name="code" required placeholder="e.g., CS201" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Assign to Class</label>
+          <div id="courseClassContainer"></div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Assign Instructor (Optional)</label>
+          <div id="courseInstructorContainer"></div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Total Sessions</label>
+          <input type="number" name="totalSessions" min="1" value="30" placeholder="e.g., 30" class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div class="flex gap-3 pt-4">
+          <button type="submit" class="flex-1 px-4 py-2 bg-primary text-background font-medium rounded-lg hover:bg-primary/90">Add Course</button>
+          <button type="button" onclick="closeModal('courseModal')" class="px-4 py-2 bg-background border border-border text-foreground rounded-lg hover:bg-card">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Course Modal (Sessions & Instructor Assignment) -->
+  <div id="editCourseModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="if(event.target === this) closeModal('editCourseModal')">
+    <div class="bg-card border border-border rounded-xl p-6 w-full max-w-md">
+      <h3 class="text-xl font-semibold text-foreground mb-4">Edit Course & Assign Instructor</h3>
+      <form id="editCourseForm" class="space-y-4">
+        <input type="hidden" id="editCourseId">
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Course Name</label>
+          <input type="text" id="editCourseName" disabled class="w-full px-4 py-2 bg-background/50 border border-border rounded-lg text-muted">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Course Instructor / Teacher</label>
+          <div id="editCourseInstructorContainer"></div>
+          <p class="text-xs text-muted mt-1">Search teacher by name or email. Will appear in their Live Terminal.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-2">Total Sessions</label>
+          <input type="number" id="editCourseTotalSessions" min="1" required class="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div class="flex gap-3 pt-4">
+          <button type="submit" class="flex-1 px-4 py-2 bg-primary text-background font-medium rounded-lg hover:bg-primary/90">Save Changes</button>
+          <button type="button" onclick="closeModal('editCourseModal')" class="px-4 py-2 bg-background border border-border text-foreground rounded-lg hover:bg-card">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let allTeachers = [];
+    let allClasses = [];
+    let allCourses = [];
+    let allStudents = [];
+
+    // Searchable Combobox instances
+    let classTeacherSelectBox = null;
+    let editClassTeacherSelectBox = null;
+    let courseClassSelectBox = null;
+    let courseInstructorSelectBox = null;
+    let editCourseInstructorSelectBox = null;
+    
+    const itemsPerPage = 5;
+    const displayedItems = {
+      teachers: itemsPerPage,
+      classes: itemsPerPage,
+      courses: itemsPerPage,
+      students: itemsPerPage
+    };
+
+    function initSearchableComboboxes() {
+      if (classTeacherSelectBox) return; // already initialized
+
+      classTeacherSelectBox = new SearchableSelect({
+        container: 'classTeacherContainer',
+        name: 'classTeacherRef',
+        placeholder: 'Search teacher by name or email...',
+        clearLabel: 'No Class Teacher (Leave Unassigned)'
+      });
+
+      editClassTeacherSelectBox = new SearchableSelect({
+        container: 'editClassTeacherContainer',
+        name: 'classTeacherRef',
+        placeholder: 'Search teacher by name or email...',
+        clearLabel: 'No Class Teacher (Leave Unassigned)'
+      });
+
+      courseClassSelectBox = new SearchableSelect({
+        container: 'courseClassContainer',
+        name: 'classRef',
+        placeholder: 'Search class by name (e.g. BSCS, Grade 6)...',
+        allowClear: false
+      });
+
+      courseInstructorSelectBox = new SearchableSelect({
+        container: 'courseInstructorContainer',
+        name: 'instructorRef',
+        placeholder: 'Search teacher by name or email...',
+        clearLabel: 'Unassigned / Assign Later'
+      });
+
+      editCourseInstructorSelectBox = new SearchableSelect({
+        container: 'editCourseInstructorContainer',
+        name: 'instructorRef',
+        placeholder: 'Search teacher by name or email...',
+        clearLabel: 'Unassigned'
+      });
+    }
+
+    function toggleSection(section) {
+      const el = document.getElementById(section + 'Section');
+      const chevron = document.getElementById(section + 'Chevron');
+      el.classList.toggle('hidden');
+      chevron.classList.toggle('rotate-180');
+    }
+
+    function showMore(section) {
+      let data = [];
+      switch(section) {
+        case 'teachers': data = allTeachers; break;
+        case 'classes': data = allClasses; break;
+        case 'courses': data = allCourses; break;
+        case 'students': data = allStudents; break;
+      }
+      displayedItems[section] = Math.min(displayedItems[section] + itemsPerPage, data.length);
+      renderSection(section);
+    }
+
+    function renderSection(section) {
+      let data, listEl, countEl, renderFn;
+      
+      switch(section) {
+        case 'teachers':
+          data = allTeachers;
+          listEl = document.getElementById('teachersList');
+          countEl = document.getElementById('teachersCount');
+          renderFn = renderTeacher;
+          break;
+        case 'classes':
+          data = allClasses;
+          listEl = document.getElementById('classesList');
+          countEl = document.getElementById('classesCount');
+          renderFn = renderClass;
+          break;
+        case 'courses':
+          data = allCourses;
+          listEl = document.getElementById('coursesList');
+          countEl = document.getElementById('coursesCount');
+          renderFn = renderCourse;
+          break;
+        case 'students':
+          data = allStudents;
+          listEl = document.getElementById('studentsList');
+          countEl = document.getElementById('studentsCount');
+          renderFn = renderStudent;
+          break;
+      }
+      
+      countEl.textContent = `${data.length} ${section}`;
+      
+      if (data.length === 0) {
+        listEl.innerHTML = `<p class="text-sm text-muted text-center py-4">No ${section} added yet</p>`;
+        document.getElementById(section + 'ShowMore').classList.add('hidden');
+        return;
+      }
+      
+      const visibleData = data.slice(0, displayedItems[section]);
+      listEl.innerHTML = visibleData.map(renderFn).join('');
+      
+      const showMoreBtn = document.getElementById(section + 'ShowMore');
+      if (displayedItems[section] >= data.length) {
+        showMoreBtn.classList.add('hidden');
+      } else {
+        showMoreBtn.classList.remove('hidden');
+        showMoreBtn.querySelector('button').textContent = `Show more (${data.length - displayedItems[section]} remaining)`;
+      }
+    }
+
+    function renderTeacher(t) {
+      return `
+        <div class="flex items-center justify-between p-3 bg-background rounded-lg hover:bg-background/70 transition-all">
+          <div>
+            <p class="text-sm font-medium text-foreground">${t.fullName}</p>
+            <p class="text-xs text-muted">${t.email} • Username: @${t.username}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderClass(c) {
+      const teacherName = c.classTeacherRef ? c.classTeacherRef.fullName : 'No Class Teacher';
+      const teacherClass = c.classTeacherRef ? 'text-primary font-medium' : 'text-muted';
+      return `
+        <div class="flex items-center justify-between p-3 bg-background rounded-lg hover:bg-background/70 transition-all gap-4">
+          <div class="flex-1">
+            <p class="text-sm font-medium text-foreground">${c.name} ${c.semester ? 'Sem ' + c.semester : ''} - Sec ${c.section || 'A'}</p>
+            <p class="text-xs text-muted mt-0.5">${c.academicYear || ''} • ${c.students ? c.students.length : 0} students • Class Teacher: <span class="${teacherClass}">${teacherName}</span></p>
+          </div>
+          <button onclick="editClassTeacher('${c._id}', '${c.name} Sec ${c.section || 'A'}', '${c.classTeacherRef ? c.classTeacherRef._id : ''}')" class="text-xs text-primary hover:text-primary/80 px-2.5 py-1.5 border border-border rounded-lg bg-card hover:bg-card/80 transition-colors">
+            ${c.classTeacherRef ? 'Change Teacher' : 'Assign Teacher'}
+          </button>
+        </div>
+      `;
+    }
+
+    function renderCourse(c) {
+      const instructorName = c.instructorRef ? c.instructorRef.fullName : 'Unassigned';
+      const instructorClass = c.instructorRef ? 'text-primary font-medium' : 'text-warning font-medium';
+      return `
+        <div class="flex items-center justify-between p-3 bg-background rounded-lg hover:bg-background/70 transition-all gap-4">
+          <div class="flex-1">
+            <p class="text-sm font-medium text-foreground">${c.name} <span class="text-xs text-muted font-mono">(${c.code})</span></p>
+            <p class="text-xs text-muted mt-0.5">${c.classRef ? c.classRef.name + ' ' + (c.classRef.semester ? 'Sem ' + c.classRef.semester : '') : 'No Class'} • ${c.totalSessions || 30} sessions • Instructor: <span class="${instructorClass}">${instructorName}</span></p>
+          </div>
+          <button onclick="editCourse('${c._id}', '${c.name}', ${c.totalSessions || 30}, '${c.instructorRef ? c.instructorRef._id : ''}')" class="text-xs text-primary hover:text-primary/80 px-2.5 py-1.5 border border-border rounded-lg bg-card hover:bg-card/80 transition-colors">
+            ${c.instructorRef ? 'Change Instructor' : 'Assign Instructor'}
+          </button>
+        </div>
+      `;
+    }
+
+    function renderStudent(s) {
+      return `
+        <div class="flex items-center justify-between p-3 bg-background rounded-lg hover:bg-background/70 transition-all">
+          <div>
+            <p class="text-sm font-medium text-foreground">${s.fullName}</p>
+            <p class="text-xs text-muted">${s.rollNo} • ${s.classRef ? s.classRef.name : 'No Class'} • ${s.isEnrolled ? '🟢 Face Active' : '⚪ Awaiting Face'}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function openModal(modalId) {
+      initSearchableComboboxes();
+      document.getElementById(modalId).classList.remove('hidden');
+      if (modalId === 'courseModal' || modalId === 'classModal') {
+        loadClasses();
+        loadTeachers();
+      }
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+    }
+
+    function editCourse(id, name, totalSessions, currentInstructorId = null) {
+      initSearchableComboboxes();
+      document.getElementById('editCourseId').value = id;
+      document.getElementById('editCourseName').value = name;
+      document.getElementById('editCourseTotalSessions').value = totalSessions;
+      
+      loadTeachers(() => {
+        if (editCourseInstructorSelectBox) {
+          editCourseInstructorSelectBox.setValue(currentInstructorId || '');
+        }
+      });
+      openModal('editCourseModal');
+    }
+
+    function editClassTeacher(id, name, currentTeacherId = null) {
+      initSearchableComboboxes();
+      document.getElementById('editClassId').value = id;
+      document.getElementById('editClassName').value = name;
+      
+      loadTeachers(() => {
+        if (editClassTeacherSelectBox) {
+          editClassTeacherSelectBox.setValue(currentTeacherId || '');
+        }
+      });
+      openModal('editClassModal');
+    }
+
+    function togglePasswordVisibility(inputId, eyeId, eyeSlashId) {
+      const input = document.getElementById(inputId);
+      const eyeIcon = document.getElementById(eyeId);
+      const eyeSlashIcon = document.getElementById(eyeSlashId);
+      
+      if (input.type === 'password') {
+        input.type = 'text';
+        eyeIcon.classList.add('hidden');
+        eyeSlashIcon.classList.remove('hidden');
+      } else {
+        input.type = 'password';
+        eyeIcon.classList.remove('hidden');
+        eyeSlashIcon.classList.add('hidden');
+      }
+    }
+
+    async function loadClasses() {
+      try {
+        const response = await fetch('/admin/api/classes');
+        allClasses = await response.json();
+        
+        const classItems = allClasses.map(c => ({
+          id: c._id,
+          title: `${c.name} ${c.semester ? 'Sem ' + c.semester : ''} - Sec ${c.section || 'A'}`,
+          subtitle: `${c.department || 'General'} • ${c.academicYear || ''}`,
+          badge: `${c.students ? c.students.length : 0} students`
+        }));
+
+        if (courseClassSelectBox) {
+          courseClassSelectBox.setData(classItems);
+        }
+      } catch (error) {
+        console.error('Error loading classes:', error);
+      }
+    }
+
+    async function loadTeachers(callback = null) {
+      try {
+        const response = await fetch('/admin/api/teachers');
+        allTeachers = await response.json();
+        
+        const teacherItems = allTeachers.map(t => ({
+          id: t._id,
+          title: t.fullName,
+          subtitle: t.email,
+          badge: `@${t.username}`
+        }));
+
+        if (classTeacherSelectBox) classTeacherSelectBox.setData(teacherItems);
+        if (editClassTeacherSelectBox) editClassTeacherSelectBox.setData(teacherItems);
+        if (courseInstructorSelectBox) courseInstructorSelectBox.setData(teacherItems);
+        if (editCourseInstructorSelectBox) editCourseInstructorSelectBox.setData(teacherItems);
+
+        if (typeof callback === 'function') {
+          callback();
+        }
+      } catch (error) {
+        console.error('Error loading teachers:', error);
+      }
+    }
+
+    async function loadData() {
+      try {
+        const [teachersRes, classesRes, coursesRes, studentsRes] = await Promise.all([
+          fetch('/admin/api/teachers'),
+          fetch('/admin/api/classes'),
+          fetch('/admin/api/courses'),
+          fetch('/admin/api/students')
+        ]);
+
+        allTeachers = await teachersRes.json();
+        allClasses = await classesRes.json();
+        allCourses = await coursesRes.json();
+        allStudents = await studentsRes.json();
+
+        displayedItems.teachers = itemsPerPage;
+        displayedItems.classes = itemsPerPage;
+        displayedItems.courses = itemsPerPage;
+        displayedItems.students = itemsPerPage;
+
+        renderSection('teachers');
+        renderSection('classes');
+        renderSection('courses');
+        renderSection('students');
+
+        // Preload combobox data
+        initSearchableComboboxes();
+        loadTeachers();
+        loadClasses();
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    }
+
+    document.getElementById('teacherForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      
+      try {
+        const response = await fetch('/admin/api/teachers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+          closeModal('teacherModal');
+          e.target.reset();
+          loadData();
+          alert('Teacher added successfully!');
+        } else {
+          const error = await response.json();
+          alert('Error: ' + error.error);
+        }
+      } catch (error) {
+        alert('Error adding teacher');
+      }
+    });
+
+    document.getElementById('classForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      data.department = 'General';
+      if (classTeacherSelectBox) {
+        data.classTeacherRef = classTeacherSelectBox.getValue() || null;
+      }
+      
+      try {
+        const response = await fetch('/admin/api/classes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+          closeModal('classModal');
+          e.target.reset();
+          if (classTeacherSelectBox) classTeacherSelectBox.setValue('');
+          loadData();
+          alert('Class created successfully!');
+        } else {
+          const error = await response.json();
+          alert('Error: ' + error.error);
+        }
+      } catch (error) {
+        alert('Error creating class');
+      }
+    });
+
+    document.getElementById('editClassForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const classId = document.getElementById('editClassId').value;
+      const classTeacherRef = editClassTeacherSelectBox ? editClassTeacherSelectBox.getValue() : null;
+      
+      try {
+        const response = await fetch(`/admin/api/classes/${classId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ classTeacherRef: classTeacherRef || null })
+        });
+        
+        if (response.ok) {
+          closeModal('editClassModal');
+          loadData();
+          alert('Class Teacher updated successfully!');
+        } else {
+          const error = await response.json();
+          alert('Error: ' + error.error);
+        }
+      } catch (error) {
+        alert('Error updating class teacher');
+      }
+    });
+
+    document.getElementById('courseForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      
+      if (courseClassSelectBox) {
+        data.classRef = courseClassSelectBox.getValue();
+      }
+      if (courseInstructorSelectBox) {
+        data.instructorRef = courseInstructorSelectBox.getValue() || null;
+      }
+
+      if (!data.classRef) {
+        alert('Please select a class for this course.');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/admin/api/courses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+          closeModal('courseModal');
+          e.target.reset();
+          if (courseClassSelectBox) courseClassSelectBox.setValue('');
+          if (courseInstructorSelectBox) courseInstructorSelectBox.setValue('');
+          loadData();
+          alert('Course added successfully!');
+        } else {
+          const error = await response.json();
+          alert('Error: ' + error.error);
+        }
+      } catch (error) {
+        alert('Error adding course');
+      }
+    });
+
+    document.getElementById('editCourseForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const courseId = document.getElementById('editCourseId').value;
+      const totalSessions = document.getElementById('editCourseTotalSessions').value;
+      const instructorRef = editCourseInstructorSelectBox ? editCourseInstructorSelectBox.getValue() : null;
+      
+      try {
+        const response = await fetch(`/admin/api/courses/${courseId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            totalSessions: parseInt(totalSessions),
+            instructorRef: instructorRef || null
+          })
+        });
+        
+        if (response.ok) {
+          closeModal('editCourseModal');
+          loadData();
+          alert('Course updated and instructor assigned successfully!');
+        } else {
+          const error = await response.json();
+          alert('Error: ' + error.error);
+        }
+      } catch (error) {
+        alert('Error updating course');
+      }
+    });
+
+    loadData();
+  </script>
+</body>
+</html>

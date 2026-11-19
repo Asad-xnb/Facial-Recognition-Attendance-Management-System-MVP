@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+  <%- include("./includes/head.ejs", { title: "Live Terminal" }) %>
+  <script defer src="/scripts/face-api.min.js"></script>
+</head>
+<body class="bg-background min-h-screen">
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40" onclick="toggleSidebar()"></div>
+  <%- include("./includes/sidebar.ejs", {active: "terminal"}) %>
+
+  <main id="mainContent" class="ml-64 p-8 transition-all duration-300">
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold text-foreground">Attendance Terminal</h1>
+      <p class="text-muted mt-1">Real-time facial recognition attendance system</p>
+    </div>
+
+    <!-- Configuration Panel -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div class="bg-card border border-border rounded-xl p-6">
+        <h3 class="font-semibold text-foreground mb-4">Teacher Information</h3>
+        <div class="space-y-2">
+          <div><p class="text-sm text-muted">Name</p><p class="font-medium text-foreground"><%= user ? user.fullName : 'Not Logged In' %></p></div>
+          <div><p class="text-sm text-muted">Email</p><p class="font-medium text-foreground"><%= user ? user.email : '-' %></p></div>
+        </div>
+      </div>
+
+      <div class="bg-card border border-border rounded-xl p-6">
+        <h3 class="font-semibold text-foreground mb-3">Select Class / Homeroom</h3>
+        <div id="classComboboxContainer"></div>
+        <p id="classStudentCount" class="text-sm text-muted mt-2"></p>
+      </div>
+
+      <div class="bg-card border border-border rounded-xl p-6">
+        <h3 class="font-semibold text-foreground mb-3">Select Course / Subject</h3>
+        <div id="courseComboboxContainer"></div>
+        <p id="courseCode" class="text-sm text-muted mt-2"></p>
+      </div>
+    </div>
+
+    <!-- Camera and Activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2">
+        <div class="bg-card border border-border rounded-xl overflow-hidden">
+          <div class="p-4 border-b border-border flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div id="statusDot" class="w-2 h-2 bg-muted rounded-full"></div>
+              <span id="statusText" class="text-sm text-muted">Standby</span>
+            </div>
+            <div class="flex gap-2">
+              <button id="startBtn" onclick="startRecognition()" disabled class="px-4 py-2 bg-primary text-background font-medium rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                Start Recognition
+              </button>
+              <button id="stopBtn" onclick="stopRecognition()" disabled class="px-4 py-2 bg-danger text-background font-medium rounded-lg hover:bg-danger/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed hidden">
+                Stop Recognition
+              </button>
+            </div>
+          </div>
+          
+          <div class="relative bg-black aspect-video">
+            <video id="videoElement" class="w-full h-full object-cover" autoplay muted playsinline></video>
+            <video id="preRecordedVideo" class="w-full h-full object-cover hidden" muted playsinline preload="none"></video>
+            <img id="ipCameraElement" class="w-full h-full object-cover hidden" />
+            <canvas id="overlay" class="absolute top-0 left-0 w-full h-full"></canvas>
+            
+            <div id="cameraOff" class="absolute inset-0 flex flex-col items-center justify-center bg-background">
+              <svg class="w-16 h-16 text-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              <p class="text-muted">Camera not active</p>
+            </div>
+          </div>
+
+          <!-- Video Controls (for pre-recorded video) -->
+          <div id="videoControls" class="hidden p-3 bg-background border-t border-border">
+            <div class="flex items-center gap-3 mb-2">
+              <button id="playPauseBtn" onclick="toggleVideoPlayback()" class="p-2 rounded-lg bg-primary text-background hover:bg-primary/90 transition-all">
+                <svg id="playIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                </svg>
+                <svg id="pauseIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"/>
+                </svg>
+              </button>
+              <div class="flex-1 flex items-center gap-2">
+                <span id="currentTime" class="text-xs text-muted w-12">0:00</span>
+                <input type="range" id="videoSeekBar" min="0" max="100" value="0" class="flex-1 accent-primary" oninput="seekVideo(this.value)">
+                <span id="totalTime" class="text-xs text-muted w-12">0:00</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-xs text-muted">Speed:</label>
+                <select id="playbackSpeed" onchange="changePlaybackSpeed()" class="bg-card border border-border text-foreground text-xs rounded px-2 py-1">
+                  <option value="0.25">0.25x</option>
+                  <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
+                  <option value="1" selected>1x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2">2x</option>
+                </select>
+              </div>
+            </div>
+            <p class="text-xs text-muted text-center">Playing pre-recorded video for attendance detection</p>
+          </div>
+
+          <div class="p-4 grid grid-cols-3 gap-4 bg-background">
+            <div class="text-center">
+              <p class="text-2xl font-bold text-primary" id="markedCount">0</p>
+              <p class="text-xs text-muted">Marked</p>
+            </div>
+            <div class="text-center">
+              <p class="text-2xl font-bold text-foreground" id="totalStudents">0</p>
+              <p class="text-xs text-muted">Total</p>
+            </div>
+            <div class="text-center">
+              <p class="text-2xl font-bold text-warning" id="pendingCount">0</p>
+              <p class="text-xs text-muted">Pending</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-card border border-border rounded-xl flex flex-col max-h-[600px]">
+        <div class="p-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-foreground">Today's Attendance</h3>
+            <p class="text-xs text-muted mt-1">Live feed</p>
+          </div>
+          <button id="endSessionBtn" onclick="openEndSessionModal()" disabled class="px-3 py-1.5 bg-danger text-background text-sm font-medium rounded-lg hover:bg-danger/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            End Session
+          </button>
+        </div>
+        <div id="activityFeed" class="flex-1 overflow-y-auto p-4 space-y-3">
+          <div class="text-center text-muted py-8">
+            <p class="text-sm">No attendance marked yet</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Not Yet Detected Panel -->
+    <div class="mt-6 bg-card border border-border rounded-xl">
+      <div class="p-4 border-b border-border flex items-center justify-between">
+        <div>
+          <h3 class="font-semibold text-foreground">Not Yet Detected</h3>
+          <p class="text-xs text-muted mt-1">Students who haven't been recognized</p>
+        </div>
+        <span id="notDetectedCount" class="px-2 py-1 bg-warning/20 text-warning text-sm font-medium rounded">0</span>
+      </div>
+      <div id="notDetectedList" class="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 max-h-[200px] overflow-y-auto">
+        <p class="text-sm text-muted col-span-full text-center py-4">Select a class to see students</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- End Session Modal -->
+  <div id="endSessionModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+      <div class="p-6 border-b border-border">
+        <h2 class="text-xl font-bold text-foreground">End Session</h2>
+        <p class="text-sm text-muted mt-1">Review unmarked students before ending the session</p>
+      </div>
+      
+      <div class="p-6 flex-1 overflow-y-auto">
+        <div id="unmarkedStudentsList" class="space-y-2">
+          <p class="text-muted text-center py-4">Loading...</p>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-border bg-background rounded-b-xl">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="markAllAbsent" checked class="w-4 h-4 accent-primary">
+            <label for="markAllAbsent" class="text-sm text-foreground">Mark all remaining as absent</label>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="closeEndSessionModal()" class="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-card transition-all">
+              Cancel
+            </button>
+            <button onclick="confirmEndSession()" class="px-4 py-2 bg-danger text-background font-medium rounded-lg hover:bg-danger/90 transition-all">
+              End Session
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let stream = null;
+    let isRecognitionActive = false;
+    let studentDescriptors = [];
+    let allClassStudents = []; // All students in class (including those without face descriptors)
+    let markedStudents = new Set();
+    let selectedClassId = null;
+    let selectedCourseId = null;
+    let faceMatcher = null;
+    let isUsingIPCamera = false;
+    let isUsingPreRecordedVideo = false;
+    let userSettings = null; // Store user settings for face recognition
+    
+    // Consecutive detection tracking
+    let consecutiveDetections = new Map(); // studentId -> { count, lastSeen, descriptor }
+    const REQUIRED_DETECTIONS = 3; // Number of consecutive detections required
+    const DETECTION_TIMEOUT = 3000; // 3 seconds - reset if not seen within this time
+
+    let classCombobox = null;
+    let courseCombobox = null;
+    let classesCache = [];
+
+    // Initialize Autocomplete Comboboxes
+    classCombobox = new SearchableSelect({
+      container: 'classComboboxContainer',
+      placeholder: 'Type class/grade name (e.g. 6A, BSCS)...',
+      allowClear: true,
+      clearLabel: 'Deselect Class',
+      onChange: async (classId, matchedItem) => {
+        const startBtn = document.getElementById('startBtn');
+        const endSessionBtn = document.getElementById('endSessionBtn');
+
+        if (!classId) {
+          selectedClassId = null;
+          selectedCourseId = null;
+          courseCombobox.setData([]);
+          startBtn.disabled = true;
+          endSessionBtn.disabled = true;
+          document.getElementById('classStudentCount').textContent = '';
+          document.getElementById('courseCode').textContent = '';
+          return;
+        }
+
+        selectedClassId = classId;
+        const cls = classesCache.find(c => String(c._id) === String(classId));
+        const courses = cls && cls.courses ? cls.courses : [];
+
+        const courseOptions = courses.map(course => ({
+          id: course._id,
+          title: course.name,
+          subtitle: course.code ? `Code: ${course.code}` : '',
+          badge: course.code === 'DAILY' ? 'Homeroom' : (course.code || 'COURSE'),
+          code: course.code
+        }));
+
+        courseCombobox.setData(courseOptions);
+
+        // If only 1 course (e.g. Daily Homeroom Attendance), auto-select it for convenience
+        if (courseOptions.length === 1) {
+          courseCombobox.setValue(courseOptions[0].id, true);
+        } else {
+          courseCombobox.setValue('', false);
+          startBtn.disabled = true;
+          endSessionBtn.disabled = true;
+          document.getElementById('courseCode').textContent = '';
+        }
+
+        try {
+          const response = await fetch(`/terminal/api/class-students/${classId}`);
+          const data = await response.json();
+          studentDescriptors = data.students || [];
+
+          document.getElementById('classStudentCount').textContent = `${studentDescriptors.length} students with face data`;
+          document.getElementById('totalStudents').textContent = studentDescriptors.length;
+
+          updateNotDetectedList();
+
+          if (studentDescriptors.length > 0 && typeof faceapi !== 'undefined') {
+            const labeledDescriptors = studentDescriptors.map(student => {
+              const descriptors = [new Float32Array(student.faceDescriptor)];
+              return new faceapi.LabeledFaceDescriptors(student._id.toString(), descriptors);
+            });
+            const threshold = userSettings?.matchingThreshold || 0.6;
+            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, threshold);
+          }
+        } catch (error) {
+          console.error('Error loading students:', error);
+        }
+      }
+    });
+
+    courseCombobox = new SearchableSelect({
+      container: 'courseComboboxContainer',
+      placeholder: 'Type course name or code...',
+      allowClear: true,
+      clearLabel: 'Deselect Course',
+      onChange: (courseId, matchedItem) => {
+        const startBtn = document.getElementById('startBtn');
+        const endSessionBtn = document.getElementById('endSessionBtn');
+
+        if (!courseId) {
+          selectedCourseId = null;
+          startBtn.disabled = true;
+          endSessionBtn.disabled = true;
+          document.getElementById('courseCode').textContent = '';
+          return;
+        }
+
+        selectedCourseId = courseId;
+        const courseCode = (matchedItem && matchedItem.code) || '';
+        document.getElementById('courseCode').textContent = courseCode ? `Code: ${courseCode}` : '';
+        startBtn.disabled = false;
+        endSessionBtn.disabled = false;
+
+        consecutiveDetections.clear();
+        loadTodayAttendance();
+      }
+    });
+
+    async function loadTeacherData() {
+      try {
+        const response = await fetch('/terminal/api/teacher-data');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        classesCache = data.classes || [];
+
+        const classOptions = classesCache.map(cls => ({
+          id: cls._id,
+          title: cls.displayName,
+          subtitle: `${cls.department || ''} • ${cls.courses.length} Subject/Session${cls.courses.length === 1 ? '' : 's'}`,
+          badge: cls.section ? `Sec ${cls.section}` : '',
+          courses: cls.courses
+        }));
+
+        classCombobox.setData(classOptions);
+      } catch (error) {
+        console.error('Error loading teacher data:', error);
+        alert('Failed to load teacher data: ' + error.message);
+      }
+    }
+
+    async function loadTodayAttendance() {
+      try {
+        const response = await fetch(`/terminal/api/today-attendance/${selectedCourseId}?classId=${selectedClassId}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        const activityFeed = document.getElementById('activityFeed');
+        activityFeed.innerHTML = '';
+        
+        if (!data.attendance || data.attendance.length === 0) {
+          activityFeed.innerHTML = '<div class="text-center text-muted py-8"><p class="text-sm">No attendance marked yet</p></div>';
+          return;
+        }
+        
+        data.attendance.forEach(record => {
+          const studentId = record.studentRef?._id || record.studentRef;
+          if (studentId) {
+            markedStudents.add(studentId.toString());
+          }
+          addActivityItem(record);
+        });
+        
+        updateStats();
+      } catch (error) {
+        console.error('Error loading attendance:', error);
+        const activityFeed = document.getElementById('activityFeed');
+        activityFeed.innerHTML = '<div class="text-center text-muted py-8"><p class="text-sm">Failed to load attendance</p></div>';
+      }
+    }
+
+    async function startRecognition() {
+      if (!selectedClassId || !selectedCourseId) {
+        alert('Please select a class and course first');
+        return;
+      }
+      
+      const startBtn = document.getElementById('startBtn');
+      
+      if (!isRecognitionActive) {
+        try {
+          // Fetch user settings for face recognition
+          const settingsResponse = await fetch('/api/settings');
+          if (settingsResponse.ok) {
+            userSettings = await settingsResponse.json();
+          }
+          
+          // Fetch camera settings from server
+          const settingsRes = await fetch('/api/camera/stream-url');
+          const cameraSettings = await settingsRes.json();
+          
+          const video = document.getElementById('videoElement');
+          const preRecordedVideo = document.getElementById('preRecordedVideo');
+          const ipImg = document.getElementById('ipCameraElement');
+          const cameraOffDiv = document.getElementById('cameraOff');
+          const videoControls = document.getElementById('videoControls');
+          
+          console.log('Camera settings:', cameraSettings);
+          
+          // Handle pre-recorded video
+          if (cameraSettings.cameraType === 'video') {
+            const videoInfo = await fetch('/api/camera/video-info').then(r => r.json());
+            
+            if (!videoInfo.hasVideo) {
+              alert('No video file uploaded. Please go to Settings and upload a video file.');
+              return;
+            }
+            
+            isUsingPreRecordedVideo = true;
+            isUsingIPCamera = false;
+            
+            // Hide other elements, show pre-recorded video
+            video.style.display = 'none';
+            ipImg.style.display = 'none';
+            preRecordedVideo.style.display = 'block';
+            videoControls.classList.remove('hidden');
+            
+            // Load video
+            preRecordedVideo.src = '/api/camera/video-stream';
+            preRecordedVideo.load(); // Explicitly load metadata
+            
+            await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => reject(new Error('Video loading timeout')), 10000);
+              
+              preRecordedVideo.onloadedmetadata = () => {
+                clearTimeout(timeout);
+                document.getElementById('totalTime').textContent = formatTime(preRecordedVideo.duration);
+                // Ensure video is paused and at start
+                preRecordedVideo.currentTime = 0;
+                preRecordedVideo.pause();
+                resolve();
+              };
+              
+              preRecordedVideo.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error('Failed to load video'));
+              };
+            });
+            
+            // Setup video time update
+            preRecordedVideo.ontimeupdate = () => {
+              const currentTime = preRecordedVideo.currentTime;
+              const duration = preRecordedVideo.duration;
+              document.getElementById('currentTime').textContent = formatTime(currentTime);
+              document.getElementById('videoSeekBar').value = (currentTime / duration) * 100;
+            };
+            
+            // Setup video ended handler
+            preRecordedVideo.onended = () => {
+              updatePlayPauseButton();
+              updateStatus('standby', 'Video completed - All faces processed');
+            };
+            
+            // Setup play/pause event handlers
+            preRecordedVideo.onplay = updatePlayPauseButton;
+            preRecordedVideo.onpause = updatePlayPauseButton;
+            
+            // Don't play yet - wait for models to load
+            updatePlayPauseButton();
+            
+            cameraOffDiv.style.display = 'none';
+            console.log('Pre-recorded video loaded');
+            
+          } else if (cameraSettings.cameraType === 'ip' && cameraSettings.streamUrl) {
+            // Use IP camera via MJPEG HTTP stream (simple like Python cv2)
+            isUsingIPCamera = true;
+            isUsingPreRecordedVideo = false;
+            
+            // Hide video element and show img
+            video.style.display = 'none';
+            preRecordedVideo.style.display = 'none';
+            videoControls.classList.add('hidden');
+            ipImg.style.display = 'block';
+            ipImg.src = '/api/camera/stream';
+            
+            // Add error handler for IP camera
+            ipImg.onerror = () => {
+              console.error('Failed to load IP camera stream');
+              stopRecognition();
+            };
+            
+            ipImg.onload = () => {
+              console.log('IP camera loaded:', ipImg.naturalWidth, 'x', ipImg.naturalHeight);
+            };
+            
+            cameraOffDiv.style.display = 'none';
+            
+            console.log('IP camera connected via MJPEG stream');
+          } else {
+            // Use built-in webcam
+            isUsingIPCamera = false;
+            isUsingPreRecordedVideo = false;
+            
+            // Hide pre-recorded video elements
+            preRecordedVideo.style.display = 'none';
+            videoControls.classList.add('hidden');
+            
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                  width: { ideal: 1280 }, 
+                  height: { ideal: 720 },
+                  facingMode: 'user'
+                } 
+              });
+              
+              console.log('Webcam stream obtained');
+              
+              video.srcObject = stream;
+              video.style.display = 'block';
+              ipImg.style.display = 'none';
+              
+              // Wait for video metadata to load
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  reject(new Error('Video loading timeout'));
+                }, 5000);
+                
+                video.onloadedmetadata = () => {
+                  clearTimeout(timeout);
+                  console.log('Video metadata loaded');
+                  video.play()
+                    .then(() => {
+                      console.log('Video playing');
+                      resolve();
+                    })
+                    .catch(err => {
+                      console.error('Error playing video:', err);
+                      reject(err);
+                    });
+                };
+              });
+              
+              cameraOffDiv.style.display = 'none';
+              console.log('Webcam started:', video.videoWidth, 'x', video.videoHeight);
+            } catch (err) {
+              console.error('Webcam error:', err);
+              throw new Error('Failed to access webcam: ' + err.message);
+            }
+          }
+          
+          await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('/scripts'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('/scripts'),
+            faceapi.nets.faceRecognitionNet.loadFromUri('/scripts')
+          ]);
+          
+          isRecognitionActive = true;
+          startBtn.disabled = true;
+          startBtn.classList.add('hidden');
+          
+          const stopBtn = document.getElementById('stopBtn');
+          stopBtn.disabled = false;
+          stopBtn.classList.remove('hidden');
+          
+          updateStatus('active', 'Recognizing...');
+          
+          // Now start video playback for pre-recorded video
+          if (isUsingPreRecordedVideo) {
+            const preRecordedVideo = document.getElementById('preRecordedVideo');
+            // Slow down playback to 0.75x so face detection can keep up
+            preRecordedVideo.playbackRate = 0.75;
+            document.getElementById('playbackSpeed').value = '0.75';
+            await preRecordedVideo.play();
+            updatePlayPauseButton();
+            console.log('Video playback started at 0.75x speed');
+          }
+          
+          recognizeFaces();
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Unable to start camera: ' + error.message);
+        }
+      }
+    }
+
+    function stopRecognition() {
+      isRecognitionActive = false;
+      
+      // Clear consecutive detections
+      consecutiveDetections.clear();
+      
+      // Stop webcam stream
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      
+      // Stop IP camera
+      if (isUsingIPCamera) {
+        const ipImg = document.getElementById('ipCameraElement');
+        ipImg.src = '';
+        ipImg.style.display = 'none';
+        isUsingIPCamera = false;
+      }
+      
+      // Stop pre-recorded video
+      if (isUsingPreRecordedVideo) {
+        const preRecordedVideo = document.getElementById('preRecordedVideo');
+        preRecordedVideo.pause();
+        preRecordedVideo.src = '';
+        preRecordedVideo.style.display = 'none';
+        document.getElementById('videoControls').classList.add('hidden');
+        isUsingPreRecordedVideo = false;
+      }
+      
+      const video = document.getElementById('videoElement');
+      video.srcObject = null;
+      video.style.display = 'block';
+      
+      document.getElementById('cameraOff').style.display = 'flex';
+      const canvas = document.getElementById('overlay');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const startBtn = document.getElementById('startBtn');
+      startBtn.disabled = false;
+      startBtn.classList.remove('hidden');
+      
+      const stopBtn = document.getElementById('stopBtn');
+      stopBtn.disabled = true;
+      stopBtn.classList.add('hidden');
+      
+      updateStatus('standby', 'Standby');
+    }
+
+    async function recognizeFaces() {
+      if (!isRecognitionActive) return;
+      
+      const video = document.getElementById('videoElement');
+      const preRecordedVideo = document.getElementById('preRecordedVideo');
+      const ipImg = document.getElementById('ipCameraElement');
+      
+      // Wait for source element to be ready
+      if (isUsingPreRecordedVideo && preRecordedVideo.readyState < 2) {
+        setTimeout(recognizeFaces, 100);
+        return;
+      } else if (isUsingIPCamera && !ipImg.complete) {
+        setTimeout(recognizeFaces, 100);
+        return;
+      } else if (!isUsingIPCamera && !isUsingPreRecordedVideo && !video.videoWidth) {
+        setTimeout(recognizeFaces, 100);
+        return;
+      }
+      
+      const overlayCanvas = document.getElementById('overlay');
+      
+      let displaySize;
+      if (isUsingPreRecordedVideo) {
+        displaySize = { width: preRecordedVideo.videoWidth || 1280, height: preRecordedVideo.videoHeight || 720 };
+      } else if (isUsingIPCamera) {
+        displaySize = { width: ipImg.naturalWidth || 1280, height: ipImg.naturalHeight || 720 };
+      } else {
+        displaySize = { width: video.videoWidth || 1280, height: video.videoHeight || 720 };
+      }
+      
+      overlayCanvas.width = displaySize.width;
+      overlayCanvas.height = displaySize.height;
+      faceapi.matchDimensions(overlayCanvas, displaySize);
+      
+      const detectFaces = async () => {
+        if (!isRecognitionActive) return;
+        
+        // Handle video ended for pre-recorded
+        if (isUsingPreRecordedVideo && preRecordedVideo.ended) {
+          updateStatus('standby', 'Video ended');
+          return;
+        }
+        
+        // Handle video paused for pre-recorded
+        if (isUsingPreRecordedVideo && preRecordedVideo.paused) {
+          setTimeout(detectFaces, 200);
+          return;
+        }
+        
+        let sourceElement;
+        if (isUsingPreRecordedVideo) {
+          sourceElement = preRecordedVideo;
+        } else if (isUsingIPCamera) {
+          sourceElement = ipImg;
+        } else {
+          sourceElement = video;
+        }
+        
+        // Check if source is ready
+        if (isUsingPreRecordedVideo && preRecordedVideo.readyState < 2) {
+          setTimeout(detectFaces, 100);
+          return;
+        } else if (isUsingIPCamera && !ipImg.complete) {
+          setTimeout(detectFaces, 100);
+          return;
+        } else if (!isUsingIPCamera && !isUsingPreRecordedVideo && !video.videoWidth) {
+          setTimeout(detectFaces, 100);
+          return;
+        }
+        
+        if (!faceMatcher) {
+          console.warn('Face matcher not ready yet; waiting for class selection');
+          updateStatus('standby', 'Select a class to start recognition');
+          setTimeout(detectFaces, 500);
+          return;
+        }
+
+        // Use lower threshold for pre-recorded video to catch all faces
+        const scoreThreshold = isUsingPreRecordedVideo ? 0.3 : 0.5;
+        
+        const detections = await faceapi.detectAllFaces(
+          sourceElement, 
+          new faceapi.TinyFaceDetectorOptions({ 
+            inputSize: userSettings?.inputSize || 416,
+            scoreThreshold: scoreThreshold 
+          })
+        ).withFaceLandmarks().withFaceDescriptors();
+        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+        
+        const ctx = overlayCanvas.getContext('2d');
+        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        
+        // Clean up old detections (not seen recently)
+        const now = Date.now();
+        for (const [studentId, data] of consecutiveDetections.entries()) {
+          if (now - data.lastSeen > DETECTION_TIMEOUT) {
+            consecutiveDetections.delete(studentId);
+          }
+        }
+        
+        resizedDetections.forEach(detection => {
+          const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+          const box = detection.detection.box;
+          
+          const isMarked = markedStudents.has(bestMatch.label.toString());
+          // Use matchingThreshold from settings
+          const threshold = userSettings?.matchingThreshold || 0.6;
+          const isMatch = bestMatch.label !== 'unknown' && bestMatch.distance < threshold;
+          
+          // Handle consecutive detection tracking (skip for pre-recorded video)
+          let detectionCount = 0;
+          if (isMatch && !isMarked) {
+            const studentId = bestMatch.label.toString();
+            
+            // For pre-recorded video, mark immediately on first detection
+            if (isUsingPreRecordedVideo) {
+              markAttendance(studentId, 1 - bestMatch.distance, Array.from(detection.descriptor));
+              detectionCount = REQUIRED_DETECTIONS; // Show as complete
+            } else {
+              // For live camera/IP camera, require consecutive detections
+              if (!consecutiveDetections.has(studentId)) {
+                consecutiveDetections.set(studentId, {
+                  count: 1,
+                  lastSeen: now,
+                  descriptor: Array.from(detection.descriptor)
+                });
+                detectionCount = 1;
+              } else {
+                const data = consecutiveDetections.get(studentId);
+                data.count++;
+                data.lastSeen = now;
+                data.descriptor = Array.from(detection.descriptor);
+                detectionCount = data.count;
+                
+                // Mark attendance when required detections reached
+                if (data.count >= REQUIRED_DETECTIONS) {
+                  markAttendance(studentId, 1 - bestMatch.distance, data.descriptor);
+                  consecutiveDetections.delete(studentId); // Clear after marking
+                }
+              }
+            }
+          }
+          
+          // Draw detection box with color based on status
+          let boxColor, labelText;
+          if (isMarked) {
+            boxColor = '#10b981'; // Green - already marked
+            labelText = '✓ MARKED';
+          } else if (isMatch) {
+            if (detectionCount > 0 && detectionCount < REQUIRED_DETECTIONS) {
+              boxColor = '#f59e0b'; // Yellow - detecting
+              labelText = `${detectionCount}/${REQUIRED_DETECTIONS} (${(1 - bestMatch.distance).toFixed(2)})`;
+            } else {
+              boxColor = '#3b82f6'; // Blue - matched
+              labelText = `${(1 - bestMatch.distance).toFixed(2)}`;
+            }
+          } else {
+            boxColor = '#ef4444'; // Red - unknown
+            labelText = 'UNKNOWN';
+          }
+          
+          ctx.strokeStyle = boxColor;
+          ctx.lineWidth = 3;
+          ctx.strokeRect(box.x, box.y, box.width, box.height);
+          
+          ctx.fillStyle = boxColor;
+          ctx.font = '16px Inter';
+          const textWidth = ctx.measureText(labelText).width;
+          ctx.fillRect(box.x, box.y - 25, textWidth + 10, 25);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(labelText, box.x + 5, box.y - 7);
+        });
+        
+        // For pre-recorded video, run continuously without delay to catch every frame
+        // For live camera, use normal interval to avoid overload
+        if (isUsingPreRecordedVideo) {
+          detectFaces(); // No delay - immediate next iteration
+        } else {
+          setTimeout(detectFaces, 200);
+        }
+      };
+      
+      detectFaces();
+    }
+
+    async function markAttendance(studentId, confidenceScore, faceDescriptor = null) {
+      if (!studentId || !selectedCourseId || !selectedClassId) {
+        console.error('Missing required data for attendance marking');
+        return;
+      }
+      
+      // Check and add to set immediately to prevent duplicates
+      const studentIdStr = studentId.toString();
+      if (markedStudents.has(studentIdStr)) return;
+      
+      // Add immediately to prevent race condition duplicates
+      markedStudents.add(studentIdStr);
+      
+      try {
+        const response = await fetch('/terminal/api/mark-attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            studentId: studentIdStr, 
+            courseId: selectedCourseId, 
+            classId: selectedClassId, 
+            confidenceScore,
+            faceDescriptor // Send descriptor for incremental learning
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Attendance marking failed:', errorData.error);
+          // If failed and not already marked, remove from set
+          if (!errorData.alreadyMarked) {
+            markedStudents.delete(studentIdStr);
+          }
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          addActivityItem(data.attendance);
+          updateStats();
+        } else if (!data.alreadyMarked) {
+          // Remove if failed and not already marked in DB
+          markedStudents.delete(studentIdStr);
+        }
+      } catch (error) {
+        console.error('Error marking attendance:', error);
+        // Remove from set on error
+        markedStudents.delete(studentIdStr);
+      }
+    }
+
+    function addActivityItem(record) {
+      const activityFeed = document.getElementById('activityFeed');
+      
+      if (activityFeed.querySelector('.text-center')) {
+        activityFeed.innerHTML = '';
+      }
+      
+      const initials = record.student.fullName.split(' ').map(n => n[0]).join('');
+      const statusColors = {
+        'present': 'primary',
+        'late': 'warning',
+        'absent': 'danger'
+      };
+      const statusColor = statusColors[record.status] || 'muted';
+      const statusLabel = record.status.toUpperCase();
+      const time = new Date(record.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      
+      const item = document.createElement('div');
+      item.className = 'flex items-center gap-3 p-3 bg-background rounded-lg border border-' + statusColor + '/20';
+      item.setAttribute('data-attendance-id', record._id);
+      item.setAttribute('data-student-id', record.studentRef?._id || record.studentRef);
+      item.innerHTML = `
+        <div class="w-10 h-10 rounded-full bg-${statusColor}/20 flex items-center justify-center text-${statusColor} font-semibold text-sm">${initials}</div>
+        <div class="flex-1 min-w-0">
+          <p class="font-medium text-foreground text-sm truncate">${record.student.fullName}</p>
+          <p class="text-xs text-muted">${record.student.rollNo}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="text-right">
+            <span class="text-xs font-medium text-${statusColor}">${statusLabel}</span>
+            <p class="text-xs text-muted">${time}</p>
+          </div>
+          <button onclick="cancelAttendance('${record._id}', '${record.studentRef?._id || record.studentRef}')" class="p-1.5 rounded-lg bg-danger/10 text-danger hover:bg-danger hover:text-background transition-all" title="Cancel attendance">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      `;
+      
+      activityFeed.insertBefore(item, activityFeed.firstChild);
+    }
+
+    function updateStats() {
+      document.getElementById('markedCount').textContent = markedStudents.size;
+      document.getElementById('pendingCount').textContent = studentDescriptors.length - markedStudents.size;
+      
+      // Also update not detected list
+      updateNotDetectedList();
+    }
+
+    function updateStatus(status, text) {
+      const dot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      
+      dot.className = 'w-2 h-2 rounded-full ' + (status === 'active' ? 'bg-primary animate-pulse' : 'bg-muted');
+      statusText.textContent = text;
+    }
+
+    async function cancelAttendance(attendanceId, studentId) {
+      if (!confirm('Are you sure you want to cancel this attendance?')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/terminal/api/cancel-attendance/${attendanceId}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to cancel attendance');
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Remove from markedStudents set
+          markedStudents.delete(studentId.toString());
+          
+          // Remove the item from UI
+          const item = document.querySelector(`[data-attendance-id="${attendanceId}"]`);
+          if (item) {
+            item.remove();
+          }
+          
+          // Check if feed is empty
+          const activityFeed = document.getElementById('activityFeed');
+          if (activityFeed.children.length === 0) {
+            activityFeed.innerHTML = '<div class="text-center text-muted py-8"><p class="text-sm">No attendance marked yet</p></div>';
+          }
+          
+          // Update stats
+          updateStats();
+        } else {
+          alert('Failed to cancel attendance: ' + (data.message || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error canceling attendance:', error);
+        alert('Failed to cancel attendance. Please try again.');
+      }
+    }
+
+    // Video playback control functions
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    function toggleVideoPlayback() {
+      const preRecordedVideo = document.getElementById('preRecordedVideo');
+      if (preRecordedVideo.paused) {
+        preRecordedVideo.play();
+      } else {
+        preRecordedVideo.pause();
+      }
+      updatePlayPauseButton();
+    }
+    
+    function updatePlayPauseButton() {
+      const preRecordedVideo = document.getElementById('preRecordedVideo');
+      const playIcon = document.getElementById('playIcon');
+      const pauseIcon = document.getElementById('pauseIcon');
+      
+      if (preRecordedVideo.paused) {
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+      } else {
+        playIcon.classList.add('hidden');
+        pauseIcon.classList.remove('hidden');
+      }
+    }
+    
+    function seekVideo(value) {
+      const preRecordedVideo = document.getElementById('preRecordedVideo');
+      const duration = preRecordedVideo.duration;
+      preRecordedVideo.currentTime = (value / 100) * duration;
+    }
+    
+    function changePlaybackSpeed() {
+      const preRecordedVideo = document.getElementById('preRecordedVideo');
+      const speed = parseFloat(document.getElementById('playbackSpeed').value);
+      preRecordedVideo.playbackRate = speed;
+    }
+
+    // Not Yet Detected Panel Functions
+    function updateNotDetectedList() {
+      const list = document.getElementById('notDetectedList');
+      const countBadge = document.getElementById('notDetectedCount');
+      
+      // Get unmarked students
+      const unmarkedStudents = studentDescriptors.filter(student => 
+        !markedStudents.has(student._id.toString())
+      );
+      
+      countBadge.textContent = unmarkedStudents.length;
+      
+      if (unmarkedStudents.length === 0) {
+        list.innerHTML = '<p class="text-sm text-primary col-span-full text-center py-4">✓ All students detected!</p>';
+        return;
+      }
+      
+      list.innerHTML = unmarkedStudents.map(student => `
+        <div class="flex items-center gap-2 p-2 bg-background rounded-lg border border-border">
+          <div class="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center text-warning text-xs font-semibold">
+            ${student.fullName.split(' ').map(n => n[0]).join('')}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-medium text-foreground truncate">${student.fullName}</p>
+            <p class="text-xs text-muted">${student.rollNo}</p>
+          </div>
+          <button onclick="manualMarkStudent('${student._id}', '${student.fullName}', '${student.rollNo}')" 
+                  class="p-1 text-primary hover:bg-primary/10 rounded transition-all" title="Mark manually">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Manual mark student with quick actions
+    async function manualMarkStudent(studentId, fullName, rollNo) {
+      const status = await showManualMarkDialog(fullName);
+      if (!status) return;
+      
+      try {
+        const response = await fetch('/terminal/api/manual-mark-attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId,
+            courseId: selectedCourseId,
+            classId: selectedClassId,
+            status
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          markedStudents.add(studentId);
+          addActivityItem({
+            ...data.attendance,
+            student: { fullName, rollNo }
+          });
+          updateStats();
+          updateNotDetectedList();
+        } else {
+          alert(data.error || 'Failed to mark attendance');
+        }
+      } catch (error) {
+        console.error('Error marking attendance:', error);
+        alert('Failed to mark attendance');
+      }
+    }
+
+    function showManualMarkDialog(studentName) {
+      return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+          <div class="bg-card border border-border rounded-xl p-6 w-full max-w-sm">
+            <h3 class="font-semibold text-foreground mb-2">Mark Attendance</h3>
+            <p class="text-sm text-muted mb-4">Select status for <strong>${studentName}</strong></p>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="this.closest('.fixed').dataset.result='present'" class="px-4 py-2 bg-primary text-background font-medium rounded-lg hover:bg-primary/90 transition-all">Present</button>
+              <button onclick="this.closest('.fixed').dataset.result='late'" class="px-4 py-2 bg-warning text-background font-medium rounded-lg hover:bg-warning/90 transition-all">Late</button>
+              <button onclick="this.closest('.fixed').dataset.result='absent'" class="px-4 py-2 bg-danger text-background font-medium rounded-lg hover:bg-danger/90 transition-all">Absent</button>
+            </div>
+            <button onclick="this.closest('.fixed').dataset.result='cancel'" class="w-full mt-3 px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-card transition-all">Cancel</button>
+          </div>
+        `;
+        
+        modal.addEventListener('click', (e) => {
+          const result = modal.dataset.result;
+          if (result) {
+            modal.remove();
+            resolve(result === 'cancel' ? null : result);
+          }
+        });
+        
+        document.body.appendChild(modal);
+      });
+    }
+
+    // End Session Modal Functions
+    async function openEndSessionModal() {
+      if (!selectedClassId || !selectedCourseId) {
+        alert('Please select a class and course first');
+        return;
+      }
+      
+      const modal = document.getElementById('endSessionModal');
+      const list = document.getElementById('unmarkedStudentsList');
+      
+      modal.classList.remove('hidden');
+      list.innerHTML = '<p class="text-muted text-center py-4">Loading...</p>';
+      
+      try {
+        const response = await fetch(`/terminal/api/unmarked-students/${selectedClassId}/${selectedCourseId}`);
+        const data = await response.json();
+        
+        if (data.unmarkedStudents.length === 0) {
+          list.innerHTML = `
+            <div class="text-center py-8">
+              <svg class="w-12 h-12 text-primary mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <p class="text-foreground font-medium">All students accounted for!</p>
+              <p class="text-sm text-muted mt-1">${data.markedCount} students have been marked</p>
+            </div>
+          `;
+          document.getElementById('markAllAbsent').parentElement.classList.add('hidden');
+        } else {
+          document.getElementById('markAllAbsent').parentElement.classList.remove('hidden');
+          list.innerHTML = `
+            <div class="mb-4 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+              <p class="text-sm text-foreground">
+                <strong>${data.unmarkedStudents.length}</strong> students have not been detected yet.
+              </p>
+            </div>
+            <div class="space-y-2">
+              ${data.unmarkedStudents.map(student => `
+                <div class="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-muted/20 flex items-center justify-center text-muted font-semibold text-sm">
+                      ${student.fullName.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div>
+                      <p class="font-medium text-foreground">${student.fullName}</p>
+                      <p class="text-xs text-muted">${student.rollNo}</p>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button onclick="quickMarkFromModal('${student._id}', 'present', this)" class="px-3 py-1 bg-primary/10 text-primary text-sm font-medium rounded hover:bg-primary/20 transition-all">Present</button>
+                    <button onclick="quickMarkFromModal('${student._id}', 'late', this)" class="px-3 py-1 bg-warning/10 text-warning text-sm font-medium rounded hover:bg-warning/20 transition-all">Late</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading unmarked students:', error);
+        list.innerHTML = '<p class="text-danger text-center py-4">Failed to load students</p>';
+      }
+    }
+
+    function closeEndSessionModal() {
+      document.getElementById('endSessionModal').classList.add('hidden');
+    }
+
+    async function quickMarkFromModal(studentId, status, button) {
+      const row = button.closest('.flex.items-center.justify-between');
+      
+      try {
+        const response = await fetch('/terminal/api/manual-mark-attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId,
+            courseId: selectedCourseId,
+            classId: selectedClassId,
+            status
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          markedStudents.add(studentId);
+          addActivityItem(data.attendance);
+          updateStats();
+          updateNotDetectedList();
+          
+          // Update row to show marked
+          row.innerHTML = `
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-${status === 'present' ? 'primary' : 'warning'}/20 flex items-center justify-center text-${status === 'present' ? 'primary' : 'warning'} font-semibold text-sm">✓</div>
+              <div>
+                <p class="font-medium text-foreground">${data.attendance.student.fullName}</p>
+                <p class="text-xs text-muted">${data.attendance.student.rollNo}</p>
+              </div>
+            </div>
+            <span class="text-sm font-medium text-${status === 'present' ? 'primary' : 'warning'}">${status.toUpperCase()}</span>
+          `;
+        } else {
+          alert(data.error || 'Failed to mark attendance');
+        }
+      } catch (error) {
+        console.error('Error marking attendance:', error);
+        alert('Failed to mark attendance');
+      }
+    }
+
+    async function confirmEndSession() {
+      const markAbsent = document.getElementById('markAllAbsent').checked;
+      
+      try {
+        const response = await fetch('/terminal/api/end-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            classId: selectedClassId,
+            courseId: selectedCourseId,
+            markAbsent
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Add absent records to activity feed
+          if (markAbsent && data.unmarkedStudents) {
+            data.unmarkedStudents.forEach(student => {
+              markedStudents.add(student._id.toString());
+              addActivityItem({
+                student: { fullName: student.fullName, rollNo: student.rollNo },
+                status: 'absent',
+                timestamp: new Date()
+              });
+            });
+          }
+          
+          updateStats();
+          updateNotDetectedList();
+          closeEndSessionModal();
+          
+          // Stop recognition if active
+          if (isRecognitionActive) {
+            stopRecognition();
+          }
+          
+          alert(data.message);
+        } else {
+          alert(data.error || 'Failed to end session');
+        }
+      } catch (error) {
+        console.error('Error ending session:', error);
+        alert('Failed to end session');
+      }
+    }
+
+    loadTeacherData();
+  </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "name": "ams-ai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Asad-xnb/Attendance-Management-System.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Asad-xnb/Attendance-Management-System/issues"
+  },
+  "homepage": "https://github.com/Asad-xnb/Attendance-Management-System#readme",
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "bcryptjs": "^3.0.3",
+    "canvas": "^3.2.0",
+    "connect-mongodb-session": "^3.1.1",
+    "dotenv": "^17.2.3",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "face-api.js": "^0.22.2",
+    "fluent-ffmpeg": "^2.1.3",
+    "mongoose": "^9.0.0",
+    "multer": "^2.0.2",
+    "node-rtsp-stream": "^0.0.9",
+    "nodemon": "^3.1.11",
+    "ws": "^8.18.3",
+    "xlsx": "^0.18.5"
+  }
+}

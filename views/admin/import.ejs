@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+  <%- include("../includes/head.ejs", { title: "Import Roster" }) %>
+</head>
+<body class="bg-background min-h-screen text-foreground">
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40" onclick="toggleSidebar()"></div>
+  <%- include("../includes/sidebar.ejs", {active: "import"}) %>
+
+  <main id="mainContent" class="ml-64 p-8 transition-all duration-300">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-2xl font-bold">LMS / Excel Roster Importer</h1>
+        <p class="text-muted mt-1">Upload any student roster from your college LMS/ERP and map columns visually in seconds.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Zero Double-Entry
+        </span>
+      </div>
+    </div>
+
+    <!-- Step 1: Upload Container -->
+    <div id="stepUpload" class="bg-card border border-border rounded-xl p-8 mb-8">
+      <div class="max-w-xl mx-auto text-center">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Upload Roster File (.xlsx, .xls, .csv)</h3>
+        <p class="text-sm text-muted mb-6">Works with exported sheets from Moodle, Canvas, Google Classroom, Excel, or custom ERPs.</p>
+
+        <div id="dropZone" class="border-2 border-dashed border-border rounded-xl p-8 hover:border-primary transition-colors cursor-pointer bg-background/50">
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleFileSelected(this.files[0])">
+          <p class="text-foreground font-medium mb-1">Click to browse or drag & drop file here</p>
+          <p class="text-xs text-muted" id="fileInfo">Supports Microsoft Excel (.xlsx, .xls) and CSV up to 25MB</p>
+        </div>
+
+        <div id="uploadProgress" class="hidden mt-6">
+          <div class="inline-flex items-center gap-2 text-primary font-medium text-sm">
+            <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            Analyzing file columns and preview data...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Visual Mapping Container (Hidden initially) -->
+    <div id="stepMapping" class="hidden space-y-8">
+      
+      <!-- Sheet Selector & Summary Banner -->
+      <div class="bg-card border border-border rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-primary">File Loaded Successfully</span>
+          <h2 class="text-lg font-bold mt-0.5" id="fileNameDisplay">Roster File</h2>
+          <p class="text-xs text-muted mt-1"><span id="totalRowsCount">0</span> student rows found in this sheet.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <label class="text-sm text-muted">Select Sheet:</label>
+          <select id="sheetSelect" onchange="switchSheet()" class="px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+          </select>
+          <button onclick="resetImporter()" class="px-3 py-2 text-xs bg-background hover:bg-card border border-border rounded-lg text-muted hover:text-foreground">
+            Change File
+          </button>
+        </div>
+      </div>
+
+      <!-- Mapping Form -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Left: Column Mappings -->
+        <div class="lg:col-span-2 bg-card border border-border rounded-xl p-6 space-y-6">
+          <div class="border-b border-border pb-4">
+            <h3 class="font-semibold text-lg">Match Columns to System Fields</h3>
+            <p class="text-xs text-muted mt-1">Select which column in your Excel file corresponds to each student field.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Roll Number -->
+            <div class="p-4 rounded-lg bg-background/60 border border-border">
+              <label class="block text-xs font-medium text-foreground mb-1">
+                Roll / Registration Number <span class="text-danger">*</span>
+              </label>
+              <select id="mapRollNo" class="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- Select Column --</option>
+              </select>
+              <span class="text-[11px] text-muted mt-1 block">Used as unique identifier & login</span>
+            </div>
+
+            <!-- Full Name -->
+            <div class="p-4 rounded-lg bg-background/60 border border-border">
+              <label class="block text-xs font-medium text-foreground mb-1">
+                Student Full Name <span class="text-danger">*</span>
+              </label>
+              <select id="mapFullName" class="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- Select Column --</option>
+              </select>
+              <span class="text-[11px] text-muted mt-1 block">Student's legal display name</span>
+            </div>
+
+            <!-- Class / Degree / Batch -->
+            <div class="p-4 rounded-lg bg-background/60 border border-border">
+              <label class="block text-xs font-medium text-foreground mb-1">
+                Class / Batch Column (Optional)
+              </label>
+              <select id="mapClassRef" class="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- None (Use Default Class) --</option>
+              </select>
+              <span class="text-[11px] text-muted mt-1 block">Auto-creates class if new</span>
+            </div>
+
+            <!-- Section -->
+            <div class="p-4 rounded-lg bg-background/60 border border-border">
+              <label class="block text-xs font-medium text-foreground mb-1">
+                Section (Optional)
+              </label>
+              <select id="mapSection" class="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- None (Defaults to 'A') --</option>
+              </select>
+              <span class="text-[11px] text-muted mt-1 block">e.g. A, B, Morning, Evening</span>
+            </div>
+
+            <!-- Semester -->
+            <div class="p-4 rounded-lg bg-background/60 border border-border">
+              <label class="block text-xs font-medium text-foreground mb-1">
+                Semester / Year (Optional)
+              </label>
+              <select id="mapSemester" class="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- None (Defaults to 1) --</option>
+              </select>
+              <span class="text-[11px] text-muted mt-1 block">Numeric semester (1 to 8)</span>
+            </div>
+
+            <!-- Course / Subject -->
+            <div class="p-4 rounded-lg bg-background/60 border border-border">
+              <label class="block text-xs font-medium text-foreground mb-1">
+                Course / Elective Code (Optional)
+              </label>
+              <select id="mapCourse" class="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- None --</option>
+              </select>
+              <span class="text-[11px] text-muted mt-1 block">Enrolls student into subject</span>
+            </div>
+
+            <!-- Email -->
+            <div class="p-4 rounded-lg bg-background/60 border border-border">
+              <label class="block text-xs font-medium text-foreground mb-1">
+                Email Address (Optional)
+              </label>
+              <select id="mapEmail" class="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- None --</option>
+              </select>
+              <span class="text-[11px] text-muted mt-1 block">For portal communication</span>
+            </div>
+
+            <!-- Guardian / Parent Phone -->
+            <div class="p-4 rounded-lg bg-background/60 border border-border">
+              <label class="block text-xs font-medium text-foreground mb-1">
+                Guardian / Parent Phone (Optional)
+              </label>
+              <select id="mapGuardianPhone" class="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                <option value="">-- None --</option>
+              </select>
+              <span class="text-[11px] text-muted mt-1 block">Contact info for records</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Default Fallbacks & Action Card -->
+        <div class="space-y-6">
+          <div class="bg-card border border-border rounded-xl p-6 space-y-4">
+            <h3 class="font-semibold text-foreground">Import Preferences</h3>
+
+            <div>
+              <label class="block text-xs font-medium text-muted mb-1.5">Default Fallback Class</label>
+              <div id="defaultClassContainer"></div>
+              <p class="text-[11px] text-muted mt-1">Assigned if class column is not provided or empty.</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-muted mb-1.5">Default Student Password</label>
+              <input type="text" id="defaultPasswordInput" value="student123" class="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary">
+              <p class="text-[11px] text-muted mt-1">Initial password for student portal access.</p>
+            </div>
+
+            <div class="p-3 bg-primary/10 border border-primary/20 rounded-lg text-xs text-primary">
+              <p class="font-medium">Face Enrollment Status:</p>
+              <p class="mt-0.5 text-muted">Imported students will be created with status <strong>"Awaiting Face"</strong>. They can register their face via self-enrollment or classroom camera.</p>
+            </div>
+
+            <button id="btnExecuteImport" onclick="executeImport()" class="w-full py-3 bg-primary text-background font-semibold rounded-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              <span>Confirm & Start Import</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Raw Excel Data Preview Table -->
+      <div class="bg-card border border-border rounded-xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-foreground">File Preview (First 5 Rows)</h3>
+          <span class="text-xs text-muted">Verify your data columns before clicking import</span>
+        </div>
+        <div class="overflow-x-auto border border-border rounded-lg">
+          <table class="w-full text-left text-sm" id="previewTable">
+            <thead class="bg-background/80 text-muted border-b border-border" id="previewTableHead"></thead>
+            <tbody class="divide-y divide-border" id="previewTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Modal / Alert Banner -->
+    <div id="resultsBanner" class="hidden mt-8 p-6 bg-card border border-primary/30 rounded-xl">
+      <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary flex-shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <div class="flex-1">
+          <h4 class="font-bold text-foreground text-lg" id="resultsTitle">Import Completed</h4>
+          <p class="text-sm text-muted mt-1" id="resultsMessage"></p>
+          <div class="grid grid-cols-3 gap-4 mt-4 max-w-md">
+            <div class="p-3 bg-background rounded-lg border border-border text-center">
+              <div class="text-xs text-muted">New Students</div>
+              <div class="text-xl font-bold text-primary mt-1" id="statCreated">0</div>
+            </div>
+            <div class="p-3 bg-background rounded-lg border border-border text-center">
+              <div class="text-xs text-muted">Updated</div>
+              <div class="text-xl font-bold text-foreground mt-1" id="statUpdated">0</div>
+            </div>
+            <div class="p-3 bg-background rounded-lg border border-border text-center">
+              <div class="text-xs text-muted">Skipped</div>
+              <div class="text-xl font-bold text-muted mt-1" id="statSkipped">0</div>
+            </div>
+          </div>
+          <div id="errorsListContainer" class="hidden mt-4 p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs text-danger">
+            <p class="font-semibold mb-1">Warnings / Errors encountered:</p>
+            <ul id="errorsList" class="list-disc pl-4 space-y-1"></ul>
+          </div>
+          <div class="mt-6 flex gap-3">
+            <a href="/admin/manage" class="px-4 py-2 bg-primary text-background font-medium rounded-lg text-sm hover:bg-primary/90">
+              View All Students
+            </a>
+            <button onclick="resetImporter()" class="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg text-sm hover:bg-card">
+              Import Another File
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let activeFileId = null;
+    let defaultClassCombobox = null;
+
+    // Initialize Default Fallback Class Searchable Select
+    const rawClasses = <%- JSON.stringify((classes || []).map(c => ({
+      id: c._id,
+      title: `${c.name} (Sem ${c.semester} - Sec ${c.section || 'A'})`,
+      subtitle: c.department || '',
+      badge: c.section ? `Sec ${c.section}` : ''
+    }))) %>;
+
+    defaultClassCombobox = new SearchableSelect({
+      container: 'defaultClassContainer',
+      placeholder: 'Type class/grade name (e.g. 6A, BSCS)...',
+      data: rawClasses,
+      allowClear: true,
+      clearLabel: 'None (Require class in file)'
+    });
+    let detectedHeaders = [];
+
+    // Drag and Drop listeners
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-primary', 'bg-primary/5');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-primary', 'bg-primary/5');
+      });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFileSelected(e.dataTransfer.files[0]);
+      }
+    });
+
+    async function handleFileSelected(file) {
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      document.getElementById('uploadProgress').classList.remove('hidden');
+
+      try {
+        const response = await fetch('/admin/api/import/preview', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        document.getElementById('uploadProgress').classList.add('hidden');
+
+        if (!data.success) {
+          alert('Upload failed: ' + (data.error || 'Unknown error'));
+          return;
+        }
+
+        activeFileId = data.fileId;
+        detectedHeaders = data.headers;
+
+        document.getElementById('fileNameDisplay').textContent = file.name;
+        document.getElementById('totalRowsCount').textContent = data.totalRows;
+
+        // Populate sheet select
+        const sheetSelect = document.getElementById('sheetSelect');
+        sheetSelect.innerHTML = '';
+        data.sheets.forEach(sheet => {
+          const opt = document.createElement('option');
+          opt.value = sheet;
+          opt.textContent = sheet;
+          if (sheet === data.activeSheet) opt.selected = true;
+          sheetSelect.appendChild(opt);
+        });
+
+        populateDropdowns(data.headers);
+        renderPreviewTable(data.headers, data.previewRows);
+
+        document.getElementById('stepUpload').classList.add('hidden');
+        document.getElementById('stepMapping').classList.remove('hidden');
+      } catch (err) {
+        document.getElementById('uploadProgress').classList.add('hidden');
+        console.error(err);
+        alert('Server error processing file');
+      }
+    }
+
+    async function switchSheet() {
+      const sheetName = document.getElementById('sheetSelect').value;
+      if (!activeFileId || !sheetName) return;
+
+      try {
+        const response = await fetch('/admin/api/import/switch-sheet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: activeFileId, sheetName })
+        });
+        const data = await response.json();
+        if (data.success) {
+          detectedHeaders = data.headers;
+          document.getElementById('totalRowsCount').textContent = data.totalRows;
+          populateDropdowns(data.headers);
+          renderPreviewTable(data.headers, data.previewRows);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function populateDropdowns(headers) {
+      const dropdowns = [
+        { id: 'mapRollNo', keywords: ['roll', 'reg', 'id', 'student_id', 'code'] },
+        { id: 'mapFullName', keywords: ['name', 'student_name', 'full_name', 'candidate'] },
+        { id: 'mapClassRef', keywords: ['class', 'batch', 'department', 'branch', 'program', 'degree'] },
+        { id: 'mapSection', keywords: ['sec', 'section', 'group'] },
+        { id: 'mapSemester', keywords: ['sem', 'semester', 'year', 'level'] },
+        { id: 'mapCourse', keywords: ['course', 'subject', 'sub_code', 'course_code'] },
+        { id: 'mapEmail', keywords: ['email', 'mail'] },
+        { id: 'mapGuardianPhone', keywords: ['phone', 'mobile', 'cell', 'guardian', 'father'] }
+      ];
+
+      dropdowns.forEach(dd => {
+        const select = document.getElementById(dd.id);
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">-- None / Select Column --</option>';
+
+        headers.forEach(h => {
+          const opt = document.createElement('option');
+          opt.value = h;
+          opt.textContent = h;
+          select.appendChild(opt);
+        });
+
+        // Smart auto-mapping heuristic
+        const matchedHeader = headers.find(h => {
+          const lower = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return dd.keywords.some(k => lower.includes(k.replace(/[^a-z0-9]/g, '')));
+        });
+
+        if (matchedHeader) {
+          select.value = matchedHeader;
+        } else if (currentVal && headers.includes(currentVal)) {
+          select.value = currentVal;
+        }
+      });
+    }
+
+    function renderPreviewTable(headers, rows) {
+      const head = document.getElementById('previewTableHead');
+      const body = document.getElementById('previewTableBody');
+
+      head.innerHTML = '<tr>' + headers.map(h => `<th class="px-4 py-2 font-medium">${h}</th>`).join('') + '</tr>';
+      body.innerHTML = rows.map(row => {
+        return '<tr>' + headers.map(h => `<td class="px-4 py-2 text-foreground font-mono text-xs truncate max-w-xs">${row[h] !== undefined ? row[h] : ''}</td>`).join('') + '</tr>';
+      }).join('');
+    }
+
+    async function executeImport() {
+      const mappings = {
+        rollNo: document.getElementById('mapRollNo').value,
+        fullName: document.getElementById('mapFullName').value,
+        classRef: document.getElementById('mapClassRef').value,
+        section: document.getElementById('mapSection').value,
+        semester: document.getElementById('mapSemester').value,
+        course: document.getElementById('mapCourse').value,
+        email: document.getElementById('mapEmail').value,
+        guardianPhone: document.getElementById('mapGuardianPhone').value
+      };
+
+      if (!mappings.rollNo || !mappings.fullName) {
+        alert('Please map both Roll Number and Full Name columns.');
+        return;
+      }
+
+      const defaultClassId = defaultClassCombobox ? defaultClassCombobox.getValue() : '';
+      if (!mappings.classRef && !defaultClassId) {
+        alert('Please either map a Class column or select a Default Fallback Class.');
+        return;
+      }
+
+      const defaultPassword = document.getElementById('defaultPasswordInput').value;
+      const sheetName = document.getElementById('sheetSelect').value;
+
+      const btn = document.getElementById('btnExecuteImport');
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>Importing Roster Records...</span>
+      `;
+
+      try {
+        const response = await fetch('/admin/api/import/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileId: activeFileId,
+            sheetName,
+            mappings,
+            defaultClassId,
+            defaultPassword
+          })
+        });
+
+        const data = await response.json();
+        btn.disabled = false;
+        btn.innerHTML = '<span>Confirm & Start Import</span>';
+
+        if (!data.success) {
+          alert('Import failed: ' + (data.error || 'Server error'));
+          return;
+        }
+
+        // Show results
+        document.getElementById('stepMapping').classList.add('hidden');
+        document.getElementById('resultsBanner').classList.remove('hidden');
+
+        document.getElementById('resultsTitle').textContent = 'Roster Ingestion Complete!';
+        document.getElementById('resultsMessage').textContent = data.message;
+        document.getElementById('statCreated').textContent = data.summary.importedCount;
+        document.getElementById('statUpdated').textContent = data.summary.updatedCount;
+        document.getElementById('statSkipped').textContent = data.summary.skippedCount;
+
+        if (data.summary.errors && data.summary.errors.length > 0) {
+          const list = document.getElementById('errorsList');
+          list.innerHTML = data.summary.errors.map(err => `<li>${err}</li>`).join('');
+          document.getElementById('errorsListContainer').classList.remove('hidden');
+        } else {
+          document.getElementById('errorsListContainer').classList.add('hidden');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>Confirm & Start Import</span>';
+        console.error(err);
+        alert('Error communicating with server');
+      }
+    }
+
+    function resetImporter() {
+      activeFileId = null;
+      detectedHeaders = [];
+      document.getElementById('fileInput').value = '';
+      document.getElementById('stepUpload').classList.remove('hidden');
+      document.getElementById('stepMapping').classList.add('hidden');
+      document.getElementById('resultsBanner').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
